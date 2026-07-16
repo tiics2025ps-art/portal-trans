@@ -1,0 +1,15 @@
+sources:
+  - name: portal_exemplo
+    base_url: https://exemplo.gov.br
+    enabled: false
+    start_urls:
+      - https://exemplo.gov.br/documentos
+    allowed_path_prefixes:
+      - /documentos
+    document_types:
+      - contratos
+      - empenhos
+    document_url_patterns:
+      - '(?i)\.pdf(?:$|[?#])'
+    follow_url_patterns:
+      - '(?i)/documentos/'
