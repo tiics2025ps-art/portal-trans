@@ -1,1 +1,97 @@
+name: Public document collector
 
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Descobrir e enfileirar sem baixar documentos"
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: public-document-collector
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Executar testes
+        env:
+          PYTHONPATH: src
+        run: pytest -q
+
+  collect:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      PYTHONPATH: src
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+      COLLECTOR_CONTACT_EMAIL: ${{ secrets.COLLECTOR_CONTACT_EMAIL }}
+      COLLECTOR_OWNER: github-actions
+      SOURCES_CONFIG: config/sources.yml
+      DRY_RUN: ${{ inputs.dry_run }}
+      MIN_DELAY_SECONDS: "25"
+      MAX_DELAY_SECONDS: "45"
+      MIN_PAUSE_SECONDS: "300"
+      MAX_PAUSE_SECONDS: "600"
+      PAUSE_EVERY_DOWNLOADS: "10"
+      MAX_FILES_PER_RUN: "40"
+      MAX_FILES_PER_DOMAIN_PER_DAY: "200"
+      MAX_PAGES_PER_RUN: "25"
+      MAX_QUEUE_SIZE: "500"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validar configuração
+        run: |
+          test -f config/sources.yml
+          test -n "$GOOGLE_SERVICE_ACCOUNT_JSON"
+          test -n "$GOOGLE_DRIVE_FOLDER_ID"
+
+      - name: Executar coletor
+        run: python -m collector.main run
+
+      - name: Salvar logs seguros
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collector-logs-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: ignore
+          retention-days: 30
